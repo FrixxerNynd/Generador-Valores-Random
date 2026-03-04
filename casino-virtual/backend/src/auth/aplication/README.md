@@ -17,3 +17,29 @@ Esta capa actúa como un puente. Su trabajo es **orquestar** el flujo de datos. 
 1. El Use Case recibe datos procesados.
 2. Llama al Dominio para validar reglas.
 3. Llama a la Infraestructura (vía interfaces) para persistir los cambios.
+
+---
+
+## 🔐 Casos de Uso de Auth
+
+### LoginUseCase
+Autentica un usuario con email y contraseña. Valida las credenciales y retorna un JWT token.
+
+**Método:** `execute(email: string, password: string)`
+
+### RegisterUseCase
+Registra un nuevo usuario en el sistema.
+
+**Método:** `execute(name: string, lastName: string, email: string, password: string)`
+- Valida que el email no esté registrado
+- Hashea la contraseña con bcrypt
+- Asigna rol `user` por defecto
+
+### UpdateUserUseCase
+Actualiza los datos del perfil de un usuario autenticado.
+
+**Método:** `execute(userId: string, updates: object)`
+- Permite actualizar: name, lastName, email, password
+- Valida que el nuevo email no esté en uso
+- Hashea la nueva contraseña si es proporcionada
+
