@@ -1,67 +1,171 @@
 # 💰 Módulo de Billetera (Wallet Module)
 
-El módulo de **Wallet** es el núcleo financiero del backend. Su responsabilidad es gestionar el saldo de los jugadores, procesar los cobros de las apuestas y el pago de premios. Es un sistema de **Alta Integridad**, diseñado para que ni un solo centavo se pierda en el proceso.
+El **Wallet Module** es el **núcleo financiero del backend**.  
+Su responsabilidad es gestionar el saldo de los jugadores, procesar los cobros de las apuestas y el pago de premios con **alta integridad**, asegurando que **ni un solo centavo se pierda** en el proceso.
+
+El sistema utiliza **fichas virtuales** con la equivalencia:
+
+> **10 fichas = $1.00 MXN**
+
+Todo el saldo se almacena **exclusivamente en enteros (integers)** para evitar errores de punto flotante y garantizar **precisión absoluta** en cada operación.
 
 ---
 
-## 🏗️ Responsabilidades por Capa
+## 🏗️ Arquitectura: Hexagonal (Ports & Adapters)
 
-Siguiendo la **Arquitectura Hexagonal**, el flujo del dinero se separa para proteger la lógica de los fallos técnicos:
-
-### 1. 📂 `src/wallet/domain` (Las Reglas del Dinero)
-
-Es la capa más protegida. Aquí se definen las leyes matemáticas de tu casino.
-
-- **Qué hace:** Define qué es un saldo y qué operaciones son válidas (ej: "No se puede retirar más de lo que hay" o "El monto de apuesta debe ser mayor a cero").
-- **Archivos típicos:**
-- `wallet.entity.ts`: Clase que contiene el saldo actual y las reglas para modificarlo.
-- `transaction.entity.ts`: Define un movimiento (Depósito, Apuesta, Premio).
-- `wallet.repository.interface.ts`: El **Puerto**. Define qué operaciones de guardado necesitamos (ej: `updateBalance`, `saveTransaction`).
-
-### 2. 📂 `src/wallet/application` (La Lógica de Negocio)
-
-Es el director que coordina el dinero entre el usuario y los juegos.
-
-- **Qué hace:** Ejecuta los procesos financieros. No sabe si el dinero viene de una ruleta o de un tragamonedas, solo sabe cuánto sumar o restar.
-- **Archivos típicos:**
-- `process-bet.use-case.ts`: Caso de uso que descuenta el dinero antes de que el juego empiece.
-- `credit-winner.use-case.ts`: Caso de uso que suma las ganancias cuando el jugador gana.
-- `get-balance.service.ts`: Consulta rápida del estado de cuenta.
-
-### 3. 📂 `src/wallet/infrastructure` (La Persistencia y Entrada)
-
-Es la capa que toca la base de datos real y recibe peticiones.
-
-- **Qué hace:** Implementa los **Adaptadores**. Aquí es donde el saldo se guarda físicamente en tablas de SQL y donde el frontend consulta datos.
-- **Archivos típicos:**
-- `wallet.controller.ts`: El punto de entrada para que Next.js muestre el saldo en pantalla.
-- `wallet.repository.ts`: El código que hace el `UPDATE` en la tabla de saldos y el `INSERT` en el historial de transacciones (Ledger).
-- `wallet.gateway.ts`: Notifica en tiempo real al usuario mediante Sockets cuando su saldo cambia tras un premio.
-
-[Image showing Wallet entity interacting with a database through a repository interface]
+El módulo está organizado siguiendo **Arquitectura Hexagonal**, separando claramente reglas de negocio, casos de uso y detalles técnicos.
 
 ---
 
-## 🛡️ ¿En qué consiste este módulo?
+## 📂 `src/wallet/domain` — *Las Reglas del Dinero*
 
-Este módulo funciona como un **Libro Mayor (Ledger)**.
+Capa **más protegida** del sistema.  
+Aquí viven las **leyes matemáticas del casino**, sin dependencias externas.
 
-1. **Validación:** Antes de jugar, verificamos que el usuario tenga saldo suficiente.
-2. **Transaccionalidad:** Usamos transacciones de base de datos (ACID). Si un juego falla, el dinero "vuelve" a la cuenta para que el usuario no pierda por un error del sistema.
-3. **Auditoría:** Cada moneda que se mueve genera una transacción en la base de datos para que siempre haya un historial de "quién, cuándo y por qué" cambió el saldo.
+### Componentes
+
+- **`wallet.entity.ts`**
+  - Representa el saldo actual del jugador.
+  - Contiene reglas invariantes:
+    - ❌ No se puede retirar más de lo disponible.
+    - ❌ El saldo nunca puede ser negativo.
+
+- **`transaction.entity.ts`**
+  - Define cada movimiento del dinero:
+    - Depósito
+    - Apuesta
+    - Premio
+  - Sirve como **Ledger** (historial auditable).
+
+- **`chip-value.vo.ts`**
+  - *Value Object* responsable de la conversión técnica:
+    - Moneda real ↔ Fichas
+  - Garantiza consistencia en todas las operaciones.
+
+- **`wallet.repository.interface.ts`**
+  - Puerto que define las operaciones de persistencia necesarias.
+  - No conoce la base de datos ni la implementación real.
 
 ---
 
-## 📋 Resumen de Archivos
+## 📂 `src/wallet/application` — *Lógica de Negocio*
 
-| Carpeta            | Tipo de Archivo  | Propósito                                                   |
-| ------------------ | ---------------- | ----------------------------------------------------------- |
-| **Domain**         | `.entity.ts`     | Reglas de validación de saldo (Negocio).                    |
-| **Application**    | `.use-case.ts`   | El proceso de cobrar o pagar un premio.                     |
-| **Infrastructure** | `.controller.ts` | API para que el usuario vea su saldo.                       |
-| **Infrastructure** | `.repository.ts` | Guardado real en SQL Server/Postgres.                       |
-| **Infrastructure** | `.gateway.ts`    | Actualizar el saldo en la pantalla del usuario (Real-time). |
+Coordina el flujo del dinero entre el usuario y los juegos.  
+No implementa reglas técnicas, **orquesta casos de uso**.
+
+### Casos de Uso
+
+- **`process-bet.use-case.ts`**
+  - Descuenta el saldo **antes** de que inicie una partida.
+
+- **`credit-winner.use-case.ts`**
+  - Acredita las ganancias cuando el jugador gana.
+
+- **`deposit-chips.use-case.ts`**
+  - Gestiona la carga de fichas tras una compra exitosa (Stripe).
+
+- **`get-balance.service.ts`**
+  - Provee una consulta rápida de:
+    - Saldo actual
+    - Historial de transacciones
 
 ---
 
-> **Nota Crítica:** La lógica de "Cuánto ganó el usuario" NO va aquí, esa va en el módulo de **Juegos**. El módulo de **Wallet** solo recibe la orden: _"Réstale 10"_ o _"Súmale 50"_.
+## 📂 `src/wallet/infrastructure` — *Persistencia y Entradas*
+
+Implementa los **adaptadores** que conectan el dominio con el mundo exterior.
+
+### Componentes
+
+- **`wallet.controller.ts`**
+  - API de entrada para consultar saldo e historial desde el frontend.
+
+- **`wallet.repository.ts`**
+  - Implementación real del repositorio usando **TypeORM**.
+  - Ejecuta `INSERT` y `UPDATE` transaccionales.
+
+- **`wallet.gateway.ts`**
+  - Notificaciones en tiempo real vía **WebSockets**
+  - Se dispara cuando el saldo cambia (ej. premio).
+
+- **`entities/wallet.orm-entity.ts`**
+  - Definición física de las tablas en la base de datos.
+
+---
+
+## 🎰 Sistema de Fichas
+
+### Equivalencia
+
+| Concepto | Valor |
+|--------|-------|
+| $1.00 MXN | 10 fichas |
+| $10 MXN | 100 fichas |
+| Apuesta mínima | 10 fichas (configurable por juego) |
+
+---
+
+### 📦 Paquetes de Compra
+
+| Precio (MXN) | Fichas Recibidas |
+|-------------|----------------|
+| $10         | 100 
+| $60         | 600 
+| $150        | 1,500 
+| $350        | 3,500 
+| $1,000      | 10,000 
+
+---
+
+### 🎨 Denominación Visual de Fichas
+
+| Color  | Valor en Fichas |
+|--------|----------------|
+| Blanca | 100 
+| Roja   | 500 
+| Verde  | 2,500 
+| Negra  | 10,000 
+| Morada | 50,000 
+| Dorada | 100,000 
+
+---
+
+## 🛡️ Garantías del Sistema
+
+### ✅ Validación
+- Verificación de fondos suficientes antes de cada apuesta.
+- Lanza `InsufficientFundsError` si el saldo no alcanza.
+
+### 🔒 Transaccionalidad (ACID)
+- Cada cambio de saldo y su transacción asociada ocurren en **una sola transacción de BD**.
+- Si algo falla, **el dinero no se mueve**.
+
+### 🧾 Auditoría
+- Cada ficha que se mueve genera una transacción.
+- Se conserva historial completo:
+  - Quién
+  - Cuándo
+  - Por qué
+
+### 🔁 Idempotencia
+- Los pagos de Stripe se procesan **una sola vez**.
+- Webhooks duplicados no generan doble saldo.
+
+---
+
+## ⚠️ Nota Crítica
+
+> La lógica de **“cuánto ganó el usuario” NO pertenece a este módulo**.
+
+Esa responsabilidad vive en el **módulo de Juegos**.  
+El Wallet **solo ejecuta órdenes claras**:
+
+- ➖ *“Réstale X fichas”*
+- ➕ *“Súmale Y fichas”*
+
+Nada más. Nada menos.
+
+---
+
+📌 **Principio clave:**  
+**El Wallet no decide resultados, solo protege el dinero.**
