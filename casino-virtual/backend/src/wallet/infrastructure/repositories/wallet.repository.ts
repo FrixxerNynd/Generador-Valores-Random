@@ -134,4 +134,21 @@ export class WalletRepository implements IWalletRepository {
       (a, b) => b.date.getTime() - a.date.getTime(),
     );
   }
+
+  async getAllTransactions(): Promise<TransactionEntity[]> {
+    const snapshot = await getDocs(collection(this.db, 'History'));
+    const transactions = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as TransactionDocument;
+      return new TransactionEntity(
+        docSnap.id,
+        data.Id_User,
+        data.Action as TransactionEntity['action'],
+        new Date(data.Date),
+        data.Description,
+        data.Currency_Type,
+        data.Amount,
+      );
+    });
+    return transactions.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
 }

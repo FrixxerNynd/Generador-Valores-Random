@@ -32,4 +32,8 @@ export class GetHistoryUseCase {
       filters,
     );
   }
+
+  async executeAdmin(): Promise<TransactionEntity[]> {
+    return await this.walletRepository.getAllTransactions();
+  }
 }
