@@ -1,19 +1,20 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { IWalletRepository } from '../../domain/repositories/wallet.repository.interface';
 import { WALLET_REPOSITORY } from '../../domain/repositories/wallet.repository.interface';
-import { CreditWinnerDto } from '../dtos/credit-winner.dto';
+import { WithdrawChipsDto } from '../dtos/withdraw-chips.dto';
 import { WalletEntity } from '../../domain/entities/wallet.entity';
 import { TransactionEntity } from '../../domain/entities/transaction.entity';
+import { ChipValue } from '../../domain/value-objects/chip-value.vo';
 
 @Injectable()
-export class CreditWinnerUseCase {
+export class WithdrawChipsUseCase {
   constructor(
     @Inject(WALLET_REPOSITORY)
     private readonly walletRepository: IWalletRepository,
   ) {}
 
-  async execute(dto: CreditWinnerDto): Promise<WalletEntity> {
-    // 1. Obtener wallet del usuario
+  async execute(dto: WithdrawChipsDto): Promise<WalletEntity> {
+    // 1. Obtener wallet
     const wallet = await this.walletRepository.findByUserId(dto.userId);
     if (!wallet) {
       throw new NotFoundException(
@@ -21,8 +22,9 @@ export class CreditWinnerUseCase {
       );
     }
 
-    // 2. Acreditar fichas ganadas
-    wallet.creditChips(dto.chipsAmount);
+    // 2. Retirar fichas → convierte a dinero internamente
+    const moneyToReceive = ChipValue.chipsToMoney(dto.chipsAmount);
+    wallet.withdrawChips(dto.chipsAmount);
 
     // 3. Persistir
     const updated = await this.walletRepository.update(wallet);
@@ -30,8 +32,8 @@ export class CreditWinnerUseCase {
     // 4. Registrar en historial
     const transaction = TransactionEntity.create(
       dto.userId,
-      'WIN',
-      dto.gameDescription,
+      'WITHDRAW',
+      `Retiro de ${dto.chipsAmount} fichas → $${moneyToReceive} MXN`,
       'chips',
       dto.chipsAmount,
     );

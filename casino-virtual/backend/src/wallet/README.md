@@ -121,12 +121,12 @@ Implementa los **adaptadores** que conectan el dominio con el mundo exterior.
 
 | Color  | Valor en Fichas |
 |--------|----------------|
-| Blanca | 100 
-| Roja   | 500 
-| Verde  | 2,500 
-| Negra  | 10,000 
-| Morada | 50,000 
-| Dorada | 100,000 
+| Blanca | 100 |
+| Roja   | 500 |
+| Verde | 2,500 |
+| Negra | 10,000 |
+| Morada | 50,000 |
+| Dorada | 100,000 |
 
 ---
 
