@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
@@ -20,18 +21,19 @@ import { WalletController } from './infrastructure/controllers/wallet.controller
 import { WalletGateway } from './infrastructure/gateways/wallet.gateway';
 import { StripeWebhookListener } from './infrastructure/listeners/stripe-webhook.listener';
 
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID,
-};
-
 const FirestoreProvider = {
   provide: FIRESTORE,
-  useFactory: () => {
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService) => {
+    const firebaseConfig = {
+      apiKey: configService.get<string>('FIREBASE_API_KEY'),
+      authDomain: configService.get<string>('FIREBASE_AUTH_DOMAIN'),
+      projectId: configService.get<string>('FIREBASE_PROJECT_ID'),
+      storageBucket: configService.get<string>('FIREBASE_STORAGE_BUCKET'),
+      messagingSenderId: configService.get<string>('FIREBASE_MESSAGING_SENDER_ID'),
+      appId: configService.get<string>('FIREBASE_APP_ID'),
+    };
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     return getFirestore(app);
   },
@@ -67,6 +69,7 @@ const WalletRepositoryProvider = {
     ProcessBetUseCase,
     CreditWinnerUseCase,
     GetBalanceService,
+    GetHistoryUseCase,
     WalletGateway,
     StripeWebhookListener,
   ],
