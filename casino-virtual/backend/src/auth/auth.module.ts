@@ -39,6 +39,10 @@ export class InMemoryAuthRepository implements IAuthRepository {
     this.users.delete(id);
     return Promise.resolve();
   }
+
+  clearAll(): void {
+    this.users.clear();
+  }
 }
 
 @Module({
@@ -58,6 +62,6 @@ export class InMemoryAuthRepository implements IAuthRepository {
     { provide: 'IPasswordHasher', useClass: BcryptAdapter },
     { provide: 'IAuthRepository', useClass: InMemoryAuthRepository },
   ],
-  exports: [JwtAuthGuard],
+  exports: [JwtAuthGuard, InMemoryAuthRepository],
 })
 export class AuthModule {}

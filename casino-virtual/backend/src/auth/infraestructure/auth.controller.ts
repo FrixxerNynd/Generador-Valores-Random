@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Patch, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Patch,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Request,
+} from '@nestjs/common';
 import { LoginUseCase } from '../aplication/login.use-case';
 import { RegisterUseCase } from '../aplication/register.use-case';
 import { UpdateUserUseCase } from '../aplication/update-user.use-case';
@@ -6,7 +15,6 @@ import { LoginDto } from './dtos/login.dto';
 import { RegisterDto } from './dtos/register.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { Request } from '@nestjs/common';
 
 interface RequestWithUser extends Request {
   user?: {
@@ -23,11 +31,13 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @HttpCode(HttpStatus.CREATED)
   async login(@Body() loginDto: LoginDto) {
     return await this.loginUseCase.execute(loginDto.email, loginDto.password);
   }
 
   @Post('register')
+  @HttpCode(HttpStatus.CREATED)
   async register(@Body() registerDto: RegisterDto) {
     return await this.registerUseCase.execute(
       registerDto.name,
@@ -38,6 +48,7 @@ export class AuthController {
   }
 
   @Patch('profile')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   async updateProfile(
     @Request() req: RequestWithUser,
