@@ -1,3 +1,7 @@
+import { IsString, IsNotEmpty, IsUUID } from 'class-validator';
+
 export class CreateWalletDto {
-  userId!: string;
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
 }

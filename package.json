@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "@nestjs/common": "^11.1.15",
+    "@nestjs/common": "^11.0.15",
+    "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.15",
     "@nestjs/jwt": "^11.0.2",
     "bcrypt": "^6.0.0",

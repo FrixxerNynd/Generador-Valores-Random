@@ -22,7 +22,12 @@ describe('Auth Endpoints (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AuthModule],
-    }).compile();
+    })
+      .overrideProvider('CreateWalletUseCase')
+      .useValue({
+        execute: jest.fn().mockResolvedValue({ coins: 0, credits: 100 }),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
@@ -56,6 +61,10 @@ describe('Auth Endpoints (e2e)', () => {
       expect(response.body).toHaveProperty('email', testUser.email);
       expect(response.body).toHaveProperty('name', testUser.name);
       expect(response.body).not.toHaveProperty('password');
+
+      // wallet info should be returned and initialized
+      expect(response.body).toHaveProperty('wallet');
+      expect(response.body.wallet).toEqual({ coins: 0, credits: 100 });
     });
 
     it('should fail if email is already registered', async () => {

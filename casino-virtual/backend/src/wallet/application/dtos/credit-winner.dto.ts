@@ -1,5 +1,15 @@
+import { IsString, IsNotEmpty, IsNumber, IsPositive, IsUUID } from 'class-validator';
+
 export class CreditWinnerDto {
-  userId!: string;
-  chipsAmount!: number; // Fichas ganadas
-  gameDescription!: string; // Ej: "Premio Tragamonedas: 3x Cereza"
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsNumber()
+  @IsPositive()
+  chipsAmount: number; // Fichas ganadas
+
+  @IsString()
+  @IsNotEmpty()
+  gameDescription: string; // Ej: "Premio Tragamonedas: 3x Cereza"
 }

@@ -1,4 +1,11 @@
+import { IsNumber, IsNotEmpty, IsPositive, IsUUID } from 'class-validator';
+
 export class WithdrawChipsDto {
-  userId!: string;
-  chipsAmount!: number; // Fichas a retirar (se convierten a MXN)
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsNumber()
+  @IsPositive()
+  chipsAmount: number; // Fichas a retirar (se convierten a MXN)
 }

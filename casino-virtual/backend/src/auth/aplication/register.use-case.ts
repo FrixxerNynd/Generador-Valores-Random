@@ -8,6 +8,7 @@ import type { IAuthRepository } from '../domain/auth.repository.interface';
 import type { IPasswordHasher } from '../domain/password-hasher.interface';
 import { User } from '../domain/user.entity';
 import { generateId } from '../../shared/utils/id.generator';
+import { CreateWalletUseCase } from '../../wallet/application/use-cases/create-wallet.use-case';
 
 @Injectable()
 export class RegisterUseCase {
@@ -16,6 +17,7 @@ export class RegisterUseCase {
     private readonly authRepository: IAuthRepository,
     @Inject('IPasswordHasher')
     private readonly passwordHasher: IPasswordHasher,
+    private readonly createWalletUseCase: CreateWalletUseCase,
   ) {}
 
   async execute(
@@ -23,7 +25,12 @@ export class RegisterUseCase {
     lastName: string,
     email: string,
     password: string,
-  ): Promise<{ id: string; email: string; name: string }> {
+  ): Promise<{
+    id: string;
+    email: string;
+    name: string;
+    wallet: { coins: number; credits: number };
+  }> {
     try {
       // Verificar si el email ya existe
       const existingUser = await this.authRepository.findByEmail(email);
@@ -51,10 +58,15 @@ export class RegisterUseCase {
       // Guardar el usuario
       await this.authRepository.save(newUser);
 
+      // Crear wallet automáticamente con saldo inicial
+      // Coins = 0, Credits = 100 (créditos de bienvenida)
+      await this.createWalletUseCase.execute({ userId });
+
       return {
         id: userId,
         email: newUser.email,
         name: newUser.name,
+        wallet: { coins: 0, credits: 100 },
       };
     } catch (error: unknown) {
       if (error instanceof BadRequestException) throw error;

@@ -1,5 +1,15 @@
+import { IsString, IsNotEmpty, IsNumber, IsPositive, IsUUID } from 'class-validator';
+
 export class ProcessBetDto {
-  userId!: string;
-  chipsAmount!: number; // Fichas a apostar
-  gameDescription!: string; // Ej: "Apuesta en Ruleta"
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsNumber()
+  @IsPositive()
+  chipsAmount: number; // Fichas a apostar
+
+  @IsString()
+  @IsNotEmpty()
+  gameDescription: string; // Ej: "Apuesta en Ruleta"
 }

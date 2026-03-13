@@ -10,6 +10,7 @@ import { JwtAuthGuard } from '../../src/auth/infraestructure/guards/jwt-auth.gua
 import { Injectable } from '@nestjs/common';
 import { IAuthRepository } from '../../src/auth/domain/auth.repository.interface';
 import { User } from './domain/user.entity';
+import { WalletModule } from '../wallet/wallet.module';
 
 @Injectable()
 export class InMemoryAuthRepository implements IAuthRepository {
@@ -51,6 +52,7 @@ export class InMemoryAuthRepository implements IAuthRepository {
       secret: 'SECRETDEVUTD',
       signOptions: { expiresIn: '1h' },
     }),
+    WalletModule,
   ],
   controllers: [AuthController],
   providers: [
