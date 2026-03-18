@@ -1,16 +1,9 @@
 import { Injectable, Inject } from '@nestjs/common';
-import {
-  Firestore,
-  collection,
-  doc,
-  getDocs,
-  addDoc,
-  setDoc,
-  query,
-  where,
-} from 'firebase/firestore';
-import type { IWalletRepository, HistoryFilters } from '../../domain/repositories/wallet.repository.interface';
-import { WALLET_REPOSITORY } from '../../domain/repositories/wallet.repository.interface';
+import { Firestore } from 'firebase-admin/firestore';
+import type {
+  IWalletRepository,
+  HistoryFilters,
+} from '../../domain/repositories/wallet.repository.interface';
 import { WalletEntity } from '../../domain/entities/wallet.entity';
 import { TransactionEntity } from '../../domain/entities/transaction.entity';
 import { WalletDocument } from '../persistence/entities/wallet.orm-entity';
@@ -25,11 +18,10 @@ export class WalletRepository implements IWalletRepository {
   // ─── Wallet ──────────────────────────────────────────────
 
   async findByUserId(userId: string): Promise<WalletEntity | null> {
-    const q = query(
-      collection(this.db, 'Wallet'),
-      where('Id_User', '==', userId),
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection('Wallet')
+      .where('Id_User', '==', userId)
+      .get();
     if (snapshot.empty) return null;
 
     const docSnap = snapshot.docs[0];
@@ -44,7 +36,7 @@ export class WalletRepository implements IWalletRepository {
       Money: wallet.money,
       Chips: wallet.chips,
     };
-    const ref = await addDoc(collection(this.db, 'Wallet'), docData);
+    const ref = await this.db.collection('Wallet').add(docData);
     return new WalletEntity(ref.id, wallet.userId, wallet.money, wallet.chips);
   }
 
@@ -54,7 +46,7 @@ export class WalletRepository implements IWalletRepository {
       Money: wallet.money,
       Chips: wallet.chips,
     };
-    await setDoc(doc(this.db, 'Wallet', wallet.id), docData);
+    await this.db.collection('Wallet').doc(wallet.id).set(docData);
     return wallet;
   }
 
@@ -71,7 +63,7 @@ export class WalletRepository implements IWalletRepository {
       Currency_Type: transaction.currencyType,
       Amount: transaction.amount,
     };
-    const ref = await addDoc(collection(this.db, 'History'), docData);
+    const ref = await this.db.collection('History').add(docData);
 
     return new TransactionEntity(
       ref.id,
@@ -88,11 +80,10 @@ export class WalletRepository implements IWalletRepository {
     userId: string,
     filters?: HistoryFilters,
   ): Promise<TransactionEntity[]> {
-    const q = query(
-      collection(this.db, 'History'),
-      where('Id_User', '==', userId),
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await this.db
+      .collection('History')
+      .where('Id_User', '==', userId)
+      .get();
 
     let transactions = snapshot.docs.map((docSnap) => {
       const data = docSnap.data() as TransactionDocument;
@@ -118,25 +109,19 @@ export class WalletRepository implements IWalletRepository {
         );
       }
       if (filters.from) {
-        transactions = transactions.filter(
-          (t) => t.date >= filters.from!,
-        );
+        transactions = transactions.filter((t) => t.date >= filters.from!);
       }
       if (filters.to) {
-        transactions = transactions.filter(
-          (t) => t.date <= filters.to!,
-        );
+        transactions = transactions.filter((t) => t.date <= filters.to!);
       }
     }
 
     // Ordenar por fecha descendente
-    return transactions.sort(
-      (a, b) => b.date.getTime() - a.date.getTime(),
-    );
+    return transactions.sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
   async getAllTransactions(): Promise<TransactionEntity[]> {
-    const snapshot = await getDocs(collection(this.db, 'History'));
+    const snapshot = await this.db.collection('History').get();
     const transactions = snapshot.docs.map((docSnap) => {
       const data = docSnap.data() as TransactionDocument;
       return new TransactionEntity(

@@ -41,7 +41,9 @@ export class AuthController {
   async register(@Body() registerDto: RegisterDto) {
     return await this.registerUseCase.execute(
       registerDto.name,
-      registerDto.lastName,
+      registerDto.last_name,
+      registerDto.nickname,
+      registerDto.born_date,
       registerDto.email,
       registerDto.password,
     );

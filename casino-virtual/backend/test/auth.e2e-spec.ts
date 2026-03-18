@@ -6,6 +6,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthModule } from '../src/auth/auth.module';
 import { InMemoryAuthRepository } from '../src/auth/auth.module';
+import { CreateWalletUseCase } from '../src/wallet/application/use-cases/create-wallet.use-case';
 
 describe('Auth Endpoints (e2e)', () => {
   let app: INestApplication<App>;
@@ -23,7 +24,7 @@ describe('Auth Endpoints (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AuthModule],
     })
-      .overrideProvider('CreateWalletUseCase')
+      .overrideProvider(CreateWalletUseCase)
       .useValue({
         execute: jest.fn().mockResolvedValue({ coins: 0, credits: 100 }),
       })
@@ -103,8 +104,9 @@ describe('Auth Endpoints (e2e)', () => {
         })
         .expect(400);
 
-      expect(response.body.message).toContain(
-        'correo electrónico no es válido',
+      // Nest returns an array of validation messages
+      expect(response.body.message).toEqual(
+        expect.arrayContaining(['El correo electrónico no es válido']),
       );
     });
 
@@ -119,8 +121,10 @@ describe('Auth Endpoints (e2e)', () => {
         })
         .expect(400);
 
-      expect(response.body.message).toContain(
-        'contraseña debe tener al menos 6 caracteres',
+      expect(response.body.message).toEqual(
+        expect.arrayContaining([
+          'La contraseña debe tener al menos 6 caracteres',
+        ]),
       );
     });
 
@@ -147,15 +151,15 @@ describe('Auth Endpoints (e2e)', () => {
         })
         .expect(400);
 
-      expect(response.body.message).toContain(
-        'nombre debe tener al menos 2 caracteres',
+      expect(response.body.message).toEqual(
+        expect.arrayContaining(['El nombre debe tener al menos 2 caracteres']),
       );
     });
   });
 
   describe('POST /auth/login', () => {
-    beforeAll(async () => {
-      // Register a test user for login tests
+    beforeEach(async () => {
+      // Register a test user for login tests before each case
       await request(app.getHttpServer()).post('/auth/register').send({
         name: 'Login',
         lastName: 'Test',
@@ -211,8 +215,8 @@ describe('Auth Endpoints (e2e)', () => {
         })
         .expect(400);
 
-      expect(response.body.message).toContain(
-        'correo electrónico no es válido',
+      expect(response.body.message).toEqual(
+        expect.arrayContaining(['El correo electrónico no es válido']),
       );
     });
 
@@ -231,17 +235,14 @@ describe('Auth Endpoints (e2e)', () => {
   describe('PATCH /auth/profile', () => {
     let profileAuthToken: string;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       // Register a test user for profile tests
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const registerResponse = await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          name: 'Profile',
-          lastName: 'Test',
-          email: 'profiletest@test.com',
-          password: 'Password123!',
-        });
+      await request(app.getHttpServer()).post('/auth/register').send({
+        name: 'Profile',
+        lastName: 'Test',
+        email: 'profiletest@test.com',
+        password: 'Password123!',
+      });
 
       // Login to get token
       const loginResponse = await request(app.getHttpServer())

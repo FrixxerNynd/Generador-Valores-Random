@@ -22,14 +22,17 @@ export class RegisterUseCase {
 
   async execute(
     name: string,
-    lastName: string,
+    last_name: string,
+    nickname: string,
+    born_date: Date,
     email: string,
     password: string,
   ): Promise<{
     id: string;
     email: string;
     name: string;
-    wallet: { coins: number; credits: number };
+    nickname: string;
+    wallet: { chips: number; money: number };
   }> {
     try {
       // Verificar si el email ya existe
@@ -40,33 +43,43 @@ export class RegisterUseCase {
         );
       }
 
+      // Verificar si el nickname ya existe
+      const existingNickname =
+        await this.authRepository.findByNickname(nickname);
+      if (existingNickname) {
+        throw new BadRequestException('El nickname ya está en uso');
+      }
+
       // Hashear la contraseña
       const passwordHash = await this.passwordHasher.hash(password);
 
-      // Crear nuevo usuario con rol por defecto 'user'
+      // Crear nuevo usuario con rol por defecto 'user' y status true
       const userId = generateId();
       const newUser = new User(
         userId,
         name,
-        lastName,
+        last_name,
+        nickname,
+        born_date,
         email,
         passwordHash,
-        ['user'], // Rol por defecto
-        true, // isActive por defecto
+        'user', // Rol por defecto
+        true, // Status activo por defecto
       );
 
       // Guardar el usuario
       await this.authRepository.save(newUser);
 
       // Crear wallet automáticamente con saldo inicial
-      // Coins = 0, Credits = 100 (créditos de bienvenida)
+      // Chips = 0, Money = 100 (créditos de bienvenida)
       await this.createWalletUseCase.execute({ userId });
 
       return {
         id: userId,
         email: newUser.email,
         name: newUser.name,
-        wallet: { coins: 0, credits: 100 },
+        nickname: newUser.nickname,
+        wallet: { chips: 0, money: 100 },
       };
     } catch (error: unknown) {
       if (error instanceof BadRequestException) throw error;

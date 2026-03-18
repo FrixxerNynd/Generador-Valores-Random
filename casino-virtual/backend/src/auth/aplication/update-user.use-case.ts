@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   BadRequestException,
   NotFoundException,
@@ -10,19 +11,20 @@ import { User } from '../domain/user.entity';
 @Injectable()
 export class UpdateUserUseCase {
   constructor(
-    private readonly authRepository: IAuthRepository,
-    private readonly passwordHasher: IPasswordHasher,
+    @Inject('IAuthRepository') private readonly authRepository: IAuthRepository,
+    @Inject('IPasswordHasher') private readonly passwordHasher: IPasswordHasher,
   ) {}
 
   async execute(
     userId: string,
     updates: {
       name?: string;
-      lastName?: string;
+      last_name?: string;
+      nickname?: string;
       email?: string;
       password?: string;
     },
-  ): Promise<{ id: string; email: string; name: string }> {
+  ): Promise<{ id: string; email: string; name: string; nickname: string }> {
     // Obtener usuario existente
     const user = await this.authRepository.findById(userId);
     if (!user) {
@@ -37,8 +39,18 @@ export class UpdateUserUseCase {
       }
     }
 
+    // Validar si el nuevo nickname ya existe en otro usuario
+    if (updates.nickname && updates.nickname !== user.nickname) {
+      const existingNickname = await this.authRepository.findByNickname(
+        updates.nickname,
+      );
+      if (existingNickname) {
+        throw new BadRequestException('El nickname ya está en uso');
+      }
+    }
+
     // Preparar los datos actualizados
-    let passwordHash = user.passwordHash;
+    let passwordHash = user.password;
     if (updates.password) {
       passwordHash = await this.passwordHasher.hash(updates.password);
     }
@@ -47,11 +59,13 @@ export class UpdateUserUseCase {
     const updatedUser = new User(
       user.id,
       updates.name || user.name,
-      updates.lastName || user.lastName,
+      updates.last_name || user.last_name,
+      updates.nickname || user.nickname,
+      user.born_date,
       updates.email || user.email,
       passwordHash,
-      user.roles,
-      user.isActive,
+      user.role,
+      user.status,
     );
 
     // Guardar cambios
@@ -61,6 +75,7 @@ export class UpdateUserUseCase {
       id: updatedUser.id,
       email: updatedUser.email,
       name: updatedUser.name,
+      nickname: updatedUser.nickname,
     };
   }
 }

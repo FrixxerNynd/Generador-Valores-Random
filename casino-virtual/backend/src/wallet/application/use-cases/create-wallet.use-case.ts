@@ -20,8 +20,13 @@ export class CreateWalletUseCase {
       );
     }
 
-    // Crear wallet con saldo en 0
-    const newWallet = WalletEntity.create(dto.userId);
+    // Crear wallet con saldo inicial de 100 MXN (crédito de bienvenida)
+    const newWallet = new WalletEntity(
+      '', // id se genera después
+      dto.userId,
+      100, // Money: 100 MXN de crédito de bienvenida
+      0, // Chips: 0
+    );
     return await this.walletRepository.create(newWallet);
   }
 }

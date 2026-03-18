@@ -2,15 +2,22 @@ export class User {
   constructor(
     public readonly id: string,
     public readonly name: string,
-    public readonly lastName: string,
+    public readonly last_name: string,
+    public readonly nickname: string,
+    public readonly born_date: Date,
     public readonly email: string,
-    public readonly passwordHash: string,
-    public readonly roles: string[],
-    public readonly isActive: boolean,
+    public readonly password: string,
+    public readonly role: string,
+    public readonly status: boolean,
   ) {}
 
-  // añadir lógica de negocio o verificar si está baneado
+  // Verificar si la cuenta está activa
   isAccountActive(): boolean {
-    return this.isActive;
+    return this.status;
+  }
+
+  // Obtener nombre completo
+  get fullName(): string {
+    return `${this.name} ${this.last_name}`;
   }
 }
