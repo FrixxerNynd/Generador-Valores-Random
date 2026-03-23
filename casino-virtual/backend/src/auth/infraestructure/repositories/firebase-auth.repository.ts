@@ -2,6 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import {
   Firestore,
   CollectionReference,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   Query,
 } from 'firebase-admin/firestore';
 import type { IAuthRepository } from '../../domain/auth.repository.interface';
@@ -27,7 +28,7 @@ export class FirebaseAuthRepository implements IAuthRepository {
   private collection: CollectionReference;
 
   constructor(@Inject(FIRESTORE_AUTH) private readonly db: Firestore) {
-    this.collection = this.db.collection('Users') as CollectionReference;
+    this.collection = this.db.collection('Users');
   }
 
   async findByEmail(email: string): Promise<User | null> {

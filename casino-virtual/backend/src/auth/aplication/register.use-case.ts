@@ -8,7 +8,7 @@ import type { IAuthRepository } from '../domain/auth.repository.interface';
 import type { IPasswordHasher } from '../domain/password-hasher.interface';
 import { User } from '../domain/user.entity';
 import { generateId } from '../../shared/utils/id.generator';
-import { CreateWalletUseCase } from '../../wallet/application/use-cases/create-wallet.use-case';
+import * as walletApiClientPort from '../infraestructure/ports/wallet-api-client.port';
 
 @Injectable()
 export class RegisterUseCase {
@@ -17,14 +17,15 @@ export class RegisterUseCase {
     private readonly authRepository: IAuthRepository,
     @Inject('IPasswordHasher')
     private readonly passwordHasher: IPasswordHasher,
-    private readonly createWalletUseCase: CreateWalletUseCase,
+    @Inject('IWalletApiClient')
+    private readonly walletApiClient: walletApiClientPort.WalletApiClientPort,
   ) {}
 
   async execute(
     name: string,
     last_name: string,
     nickname: string,
-    born_date: Date,
+    born_date: Date | string,
     email: string,
     password: string,
   ): Promise<{
@@ -53,6 +54,15 @@ export class RegisterUseCase {
       // Hashear la contraseña
       const passwordHash = await this.passwordHasher.hash(password);
 
+      const normalizedBornDate =
+        born_date instanceof Date ? born_date : new Date(born_date);
+
+      if (Number.isNaN(normalizedBornDate.getTime())) {
+        throw new BadRequestException(
+          'La fecha de nacimiento debe ser una fecha válida',
+        );
+      }
+
       // Crear nuevo usuario con rol por defecto 'user' y status true
       const userId = generateId();
       const newUser = new User(
@@ -60,29 +70,29 @@ export class RegisterUseCase {
         name,
         last_name,
         nickname,
-        born_date,
+        normalizedBornDate,
         email,
         passwordHash,
-        'user', // Rol por defecto
-        true, // Status activo por defecto
+        'user',   // Rol por defecto
+        true,     // Status activo por defecto
       );
 
       // Guardar el usuario
       await this.authRepository.save(newUser);
 
-      // Crear wallet automáticamente con saldo inicial
-      // Chips = 0, Money = 100 (créditos de bienvenida)
-      await this.createWalletUseCase.execute({ userId });
+      // Crear wallet automáticamente llamando al servicio de wallet vía API
+      await this.walletApiClient.createWallet(userId);
 
       return {
         id: userId,
         email: newUser.email,
         name: newUser.name,
         nickname: newUser.nickname,
-        wallet: { chips: 0, money: 100 },
+        wallet: { chips: 0, money: 0 },
       };
     } catch (error: unknown) {
       if (error instanceof BadRequestException) throw error;
+      console.error('[RegisterUseCase] Error inesperado:', error);
       throw new InternalServerErrorException('Error al registrar el usuario');
     }
   }

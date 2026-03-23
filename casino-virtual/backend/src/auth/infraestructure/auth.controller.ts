@@ -40,12 +40,12 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() registerDto: RegisterDto) {
     return await this.registerUseCase.execute(
-      registerDto.name,
-      registerDto.last_name,
-      registerDto.nickname,
-      registerDto.born_date,
-      registerDto.email,
-      registerDto.password,
+      registerDto.Name,
+      registerDto.Last_name,
+      registerDto.Nickname,
+      registerDto.Born_Date,
+      registerDto.Email,
+      registerDto.Password,
     );
   }
 

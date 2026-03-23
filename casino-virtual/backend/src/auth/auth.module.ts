@@ -1,153 +1,174 @@
+// ─── auth/auth.module.ts ──────────────────────────────────────────────────────
+// WalletModule ya NO se importa aquí.
+// En su lugar se registra WalletApiClient como implementación del puerto
+// WALLET_CLIENT_PORT, de modo que Auth se comunica con Wallet únicamente
+// a través de llamadas HTTP (igual que lo haría un microservicio externo).
+
 import { Injectable, Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+
 import {
   getApp,
   getApps,
   initializeApp,
   cert,
   applicationDefault,
+  type ServiceAccount,
 } from 'firebase-admin/app';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// Domain
+import { IAuthRepository } from './domain/auth.repository.interface';
+import { User } from './domain/user.entity';
+
+// Application
 import { LoginUseCase } from './aplication/login.use-case';
 import { RegisterUseCase } from './aplication/register.use-case';
 import { UpdateUserUseCase } from './aplication/update-user.use-case';
+
+// Infrastructure
 import { AuthController } from './infraestructure/auth.controller';
 import { BcryptAdapter } from './infraestructure/adapters/bcrypt.adapter';
 import { JwtAdapter } from './infraestructure/adapters/jwt.adapter';
 import { JwtAuthGuard } from './infraestructure/guards/jwt-auth.guard';
-import { IAuthRepository } from './domain/auth.repository.interface';
-import { User } from './domain/user.entity';
-import { WalletModule } from '../wallet/wallet.module';
 import {
   FirebaseAuthRepository,
   FIRESTORE_AUTH,
 } from './infraestructure/repositories/firebase-auth.repository';
 
-// InMemory Repository (fallback cuando no hay Firebase)
-@Injectable()
-export class InMemoryAuthRepository implements IAuthRepository {
-  private users: Map<string, User> = new Map();
+// Wallet integration — sólo el puerto y su cliente HTTP
+import { WalletApiClient } from './infraestructure/adapters/wallet-api.client';
 
-  findByEmail(email: string): Promise<User | null> {
-    return Promise.resolve(
-      Array.from(this.users.values()).find((u) => u.email === email) || null,
-    );
+// ── InMemory fallback ─────────────────────────────────────────────────────────
+
+// ── Firebase Firestore provider ───────────────────────────────────────────────
+const parseServiceAccountFromEnv = (): ServiceAccount | null => {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    const projectId = parsed.projectId ?? parsed.project_id;
+    const clientEmail = parsed.clientEmail ?? parsed.client_email;
+    const privateKeyRaw = parsed.privateKey ?? parsed.private_key;
+
+    if (!projectId || !clientEmail || !privateKeyRaw) {
+      console.warn(
+        '⚠️ FIREBASE_SERVICE_ACCOUNT_JSON incompleto (faltan projectId/clientEmail/privateKey).',
+      );
+      return null;
+    }
+
+    return {
+      projectId,
+      clientEmail,
+      privateKey: privateKeyRaw.replace(/\\n/g, '\n'),
+    };
+  } catch (error) {
+    console.warn('⚠️ FIREBASE_SERVICE_ACCOUNT_JSON inválido. Error:', error);
+    return null;
+  }
+};
+
+const hasFirebaseAdminCredentials = (): boolean => {
+  return Boolean(
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+      process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  );
+};
+
+const createFirebaseAdminApp = () => {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const serviceAccount = parseServiceAccountFromEnv();
+
+  if (serviceAccount) {
+    return initializeApp({
+      credential: cert(serviceAccount),
+      projectId: serviceAccount.projectId ?? projectId,
+    });
   }
 
-  findByNickname(nickname: string): Promise<User | null> {
-    return Promise.resolve(
-      Array.from(this.users.values()).find((u) => u.nickname === nickname) ||
-        null,
-    );
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    return initializeApp({
+      credential: applicationDefault(),
+      projectId,
+    });
   }
 
-  findById(id: string): Promise<User | null> {
-    return Promise.resolve(this.users.get(id) || null);
-  }
-
-  save(user: User): Promise<void> {
-    this.users.set(user.id, user);
-    return Promise.resolve();
-  }
-
-  update(user: User): Promise<void> {
-    this.users.set(user.id, user);
-    return Promise.resolve();
-  }
-
-  delete(id: string): Promise<void> {
-    this.users.delete(id);
-    return Promise.resolve();
-  }
-
-  clearAll(): void {
-    this.users.clear();
-  }
-}
+  return initializeApp({ projectId });
+};
 
 const FirestoreAuthProvider = {
   provide: FIRESTORE_AUTH,
-  imports: [ConfigModule],
-  inject: [ConfigService],
-  useFactory: (configService: ConfigService) => {
-    const projectId = configService.get<string>('FIREBASE_PROJECT_ID');
-    const serviceAccountJson = configService.get<string>(
-      'FIREBASE_SERVICE_ACCOUNT_JSON',
-    );
-
-    // If firebase isn't configured, provide a stub
-    if (!projectId && !serviceAccountJson) {
-      return {} as Firestore;
-    }
-
-    const app =
-      getApps().length > 0
-        ? getApp()
-        : initializeApp({
-            projectId,
-            credential: serviceAccountJson
-              ? cert(JSON.parse(serviceAccountJson))
-              : applicationDefault(),
-          });
-
+  useFactory: () => {
+    const app = getApps().length === 0 ? createFirebaseAdminApp() : getApp();
     return getFirestore(app);
   },
 };
 
+// ── Módulo ────────────────────────────────────────────────────────────────────
 @Module({
   imports: [
     ConfigModule,
     JwtModule.register({
-      secret: 'SECRETDEVUTD',
+      secret: process.env.JWT_SECRET ?? 'SECRETDEVUTD',
       signOptions: { expiresIn: '1h' },
     }),
-    WalletModule,
+
+    // ✅ WalletModule ya NO se importa — la comunicación es por HTTP
   ],
   controllers: [AuthController],
   providers: [
-    // Firebase
+    // ── Firebase ──────────────────────────────────────────────────────────────
     FirestoreAuthProvider,
-    // InMemory Repository (fallback cuando no hay Firebase)
-    InMemoryAuthRepository,
-    // Repository - usa Firebase si está disponible, si no usa InMemory
     FirebaseAuthRepository,
+
+    // ── IAuthRepository (Firebase o InMemory según entorno) ──────────────────
     {
       provide: 'IAuthRepository',
       useFactory: (
-        firebaseRepo: FirebaseAuthRepository,
-        inMemoryRepo: InMemoryAuthRepository,
+        firebaseRepo: FirebaseAuthRepository
       ) => {
-        // Verificar si Firestore está configurado
-        const projectId = process.env.FIREBASE_PROJECT_ID;
-        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-        if (projectId && serviceAccount) {
+        if (process.env.FIREBASE_PROJECT_ID && hasFirebaseAdminCredentials()) {
           console.log('✅ Usando Firebase Auth Repository');
           return firebaseRepo;
-        } else {
-          console.log(
-            '⚠️ Firebase no configurado. Usando repositorio en memoria',
-          );
-          return inMemoryRepo;
         }
+          throw new Error('❌ Firebase Admin no configurado: faltan credenciales. No se permite fallback a memoria.');
       },
-      inject: [FirebaseAuthRepository, InMemoryAuthRepository],
+      inject: [FirebaseAuthRepository],
     },
-    // Use Cases
+
+    // ── Wallet client (HTTP) ──────────────────────────────────────────────────
+    // WalletApiClient se instancia aquí y queda asociado al token WALLET_CLIENT_PORT.
+    // RegisterUseCase lo inyecta con @Inject(WALLET_CLIENT_PORT).
+    WalletApiClient,
+    {
+      provide: 'WALLET_CLIENT_PORT',
+      useExisting: WalletApiClient
+    },
+    {
+      provide: 'IWalletApiClient',
+      useClass: WalletApiClient,
+    },
+
+    // ── Use Cases ─────────────────────────────────────────────────────────────
     LoginUseCase,
     RegisterUseCase,
     UpdateUserUseCase,
-    // Adapters & Guards
+
+    // ── Adapters & Guards ─────────────────────────────────────────────────────
     JwtAdapter,
     JwtAuthGuard,
     { provide: 'IPasswordHasher', useClass: BcryptAdapter },
   ],
   exports: [
+    JwtModule,
+    JwtAdapter,
     'IAuthRepository',
     JwtAuthGuard,
     FirebaseAuthRepository,
-    InMemoryAuthRepository,
   ],
 })
 export class AuthModule {}
