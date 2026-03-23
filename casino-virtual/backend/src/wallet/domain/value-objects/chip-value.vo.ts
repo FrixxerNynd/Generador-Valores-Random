@@ -2,7 +2,6 @@ export class ChipValue {
   static readonly CHIPS_PER_PESO = 10;
 
   static readonly PACKAGES: { price: number; chips: number }[] = [
-    { price: 0, chips: 0},
     { price: 10, chips: 100 },
     { price: 60, chips: 600 },
     { price: 150, chips: 1500 },

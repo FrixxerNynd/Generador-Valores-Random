@@ -3,12 +3,14 @@ import {
   Get,
   Post,
   Body,
-  Param,
   Query,
   HttpCode,
   HttpStatus,
   HttpException,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { GetBalanceService } from '../../application/services/get-balance.service';
 import { DepositChipsUseCase } from '../../application/use-cases/deposit-chips.use-case';
 import { ProcessBetUseCase } from '../../application/use-cases/process-bet.use-case';
@@ -23,6 +25,8 @@ import { CreateWalletDto } from '../../application/dtos/create-wallet.dto';
 import { WithdrawChipsDto } from '../../application/dtos/withdraw-chips.dto';
 import { InsufficientFundsError } from '../../domain/errors/insufficient-funds.error';
 import { ChipValue } from '../../domain/value-objects/chip-value.vo';
+import { JwtAuthGuard } from '../../../auth/infraestructure/guards/jwt-auth.guard';
+import { getAuthenticatedUserId } from '../../../shared/utils/auth-user.util';
 
 @Controller('wallet')
 export class WalletController {
@@ -47,7 +51,7 @@ export class WalletController {
         message: 'Wallet creada exitosamente',
         wallet,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         error.message,
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -55,13 +59,15 @@ export class WalletController {
     }
   }
 
-  // ─── GET /wallet/:userId ────────────────────────────────────
+  // ─── GET /wallet/me ────────────────────────────────────────
   // Consultar saldo + historial completo
-  @Get(':userId')
-  async getBalance(@Param('userId') userId: string) {
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getBalance(@Req() request: Request) {
     try {
+      const userId = getAuthenticatedUserId(request);
       return await this.getBalanceService.execute(userId);
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         error.message,
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -69,18 +75,20 @@ export class WalletController {
     }
   }
 
-  // ─── GET /wallet/:userId/history ───────────────────────────
+  // ─── GET /wallet/me/history ────────────────────────────────
   // Historial con filtros opcionales
   // Query params: action, currencyType, from, to
-  @Get(':userId/history')
+  @Get('me/history')
+  @UseGuards(JwtAuthGuard)
   async getHistory(
-    @Param('userId') userId: string,
+    @Req() request: Request,
     @Query('action') action?: string,
     @Query('currencyType') currencyType?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
     try {
+      const userId = getAuthenticatedUserId(request);
       const transactions = await this.getHistoryUseCase.execute({
         userId,
         action: action as any,
@@ -93,7 +101,7 @@ export class WalletController {
         total: transactions.length,
         transactions,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         error.message,
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -115,15 +123,20 @@ export class WalletController {
   // ─── POST /wallet/deposit ───────────────────────────────────
   // Depositar dinero y convertir a fichas
   @Post('deposit')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async deposit(@Body() dto: DepositChipsDto) {
+  async deposit(@Body() dto: DepositChipsDto, @Req() request: Request) {
     try {
-      const wallet = await this.depositChipsUseCase.execute(dto);
+      const userId = getAuthenticatedUserId(request);
+      const wallet = await this.depositChipsUseCase.execute({
+        ...dto,
+        userId,
+      });
       return {
         message: `Depósito exitoso. Saldo: ${wallet.chips} fichas`,
         wallet,
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof InsufficientFundsError) {
         throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }
@@ -137,15 +150,20 @@ export class WalletController {
   // ─── POST /wallet/bet ───────────────────────────────────────
   // Descontar fichas al apostar
   @Post('bet')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async processBet(@Body() dto: ProcessBetDto) {
+  async processBet(@Body() dto: ProcessBetDto, @Req() request: Request) {
     try {
-      const wallet = await this.processBetUseCase.execute(dto);
+      const userId = getAuthenticatedUserId(request);
+      const wallet = await this.processBetUseCase.execute({
+        ...dto,
+        userId,
+      });
       return {
         message: `Apuesta procesada. Saldo restante: ${wallet.chips} fichas`,
         wallet,
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof InsufficientFundsError) {
         throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }
@@ -159,15 +177,20 @@ export class WalletController {
   // ─── POST /wallet/credit ────────────────────────────────────
   // Acreditar fichas al ganador
   @Post('credit')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async creditWinner(@Body() dto: CreditWinnerDto) {
+  async creditWinner(@Body() dto: CreditWinnerDto, @Req() request: Request) {
     try {
-      const wallet = await this.creditWinnerUseCase.execute(dto);
+      const userId = getAuthenticatedUserId(request);
+      const wallet = await this.creditWinnerUseCase.execute({
+        ...dto,
+        userId,
+      });
       return {
         message: `Premio acreditado. Nuevo saldo: ${wallet.chips} fichas`,
         wallet,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         error.message,
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -178,15 +201,20 @@ export class WalletController {
   // ─── POST /wallet/withdraw ──────────────────────────────────
   // Retirar fichas → convertir a dinero real
   @Post('withdraw')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async withdraw(@Body() dto: WithdrawChipsDto) {
+  async withdraw(@Body() dto: WithdrawChipsDto, @Req() request: Request) {
     try {
-      const wallet = await this.withdrawChipsUseCase.execute(dto);
+      const userId = getAuthenticatedUserId(request);
+      const wallet = await this.withdrawChipsUseCase.execute({
+        ...dto,
+        userId,
+      });
       return {
         message: `Retiro exitoso. Fichas restantes: ${wallet.chips}`,
         wallet,
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof InsufficientFundsError) {
         throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }

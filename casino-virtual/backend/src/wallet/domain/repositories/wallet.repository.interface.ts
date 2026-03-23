@@ -16,5 +16,4 @@ export interface IWalletRepository {
   update(wallet: WalletEntity): Promise<WalletEntity>;
   saveTransaction(transaction: TransactionEntity): Promise<TransactionEntity>;
   getTransactionsByUserId(userId: string, filters?: HistoryFilters): Promise<TransactionEntity[]>;
-  getAllTransactions(): Promise<TransactionEntity[]>;
 }
