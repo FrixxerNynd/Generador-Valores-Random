@@ -18,6 +18,7 @@ import { CreditWinnerUseCase } from '../../application/use-cases/credit-winner.u
 import { CreateWalletUseCase } from '../../application/use-cases/create-wallet.use-case';
 import { WithdrawChipsUseCase } from '../../application/use-cases/withdraw-chips.use-case';
 import { GetHistoryUseCase } from '../../application/use-cases/get-history.use-case';
+import { GetResumenUseCase } from '../../application/use-cases/get-resumen.use-case';
 import { DepositChipsDto } from '../../application/dtos/deposit-chips.dto';
 import { ProcessBetDto } from '../../application/dtos/process-bet.dto';
 import { CreditWinnerDto } from '../../application/dtos/credit-winner.dto';
@@ -38,6 +39,7 @@ export class WalletController {
     private readonly createWalletUseCase: CreateWalletUseCase,
     private readonly withdrawChipsUseCase: WithdrawChipsUseCase,
     private readonly getHistoryUseCase: GetHistoryUseCase,
+    private readonly getResumenUseCase: GetResumenUseCase,
   ) {}
 
   // ─── POST /wallet/create ────────────────────────────────────
@@ -76,8 +78,8 @@ export class WalletController {
   }
 
   // ─── GET /wallet/me/history ────────────────────────────────
-  // Historial con filtros opcionales
-  // Query params: action, currencyType, from, to
+  // Historial paginado con filtros opcionales
+  // Query params: action, currencyType, from, to, page, limit
   @Get('me/history')
   @UseGuards(JwtAuthGuard)
   async getHistory(
@@ -86,21 +88,43 @@ export class WalletController {
     @Query('currencyType') currencyType?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     try {
       const userId = getAuthenticatedUserId(request);
-      const transactions = await this.getHistoryUseCase.execute({
+      return await this.getHistoryUseCase.execute({
         userId,
         action: action as any,
         currencyType: currencyType as any,
         from,
         to,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
       });
-      return {
+    } catch (error: any) {
+      throw new HttpException(
+        error.message,
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // ─── GET /wallet/me/resumen ────────────────────────────────────
+  // Datos para gráficas del historial: evolución de balance + distribución por juego
+  // Query params: days (1-365, default: 7)
+  @Get('me/resumen')
+  @UseGuards(JwtAuthGuard)
+  async getResumen(
+    @Req() request: Request,
+    @Query('days') days?: string,
+  ) {
+    try {
+      const userId = getAuthenticatedUserId(request);
+      return await this.getResumenUseCase.execute({
         userId,
-        total: transactions.length,
-        transactions,
-      };
+        days: days ? Number(days) : undefined,
+      });
     } catch (error: any) {
       throw new HttpException(
         error.message,

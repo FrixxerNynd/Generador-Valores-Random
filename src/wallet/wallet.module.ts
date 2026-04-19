@@ -14,6 +14,7 @@ import { ProcessBetUseCase } from './application/use-cases/process-bet.use-case'
 import { CreditWinnerUseCase } from './application/use-cases/credit-winner.use-case';
 import { WithdrawChipsUseCase } from './application/use-cases/withdraw-chips.use-case';
 import { GetHistoryUseCase } from './application/use-cases/get-history.use-case';
+import { GetResumenUseCase } from './application/use-cases/get-resumen.use-case';
 
 // Infrastructure
 import { WalletRepository, FIRESTORE } from './infrastructure/repositories/wallet.repository';
@@ -60,6 +61,7 @@ const WalletRepositoryProvider = {
     CreditWinnerUseCase,
     WithdrawChipsUseCase,
     GetHistoryUseCase,
+    GetResumenUseCase,
     // Infrastructure
     WalletGateway,
     StripeWebhookListener,
