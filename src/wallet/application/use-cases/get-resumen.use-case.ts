@@ -83,14 +83,9 @@ export class GetResumenUseCase {
   }
 
   /**
-   * Reconstruye el balance al final de cada uno de los últimos N días
-   * partiendo del balance actual y restrocediendo en el tiempo.
-   *
-   * Algoritmo:
-   *   - balance[hoy] = wallet.chips  (conocido)
-   *   - balance[ayer] = balance[hoy] - netChange[hoy]
-   *   - balance[anteayer] = balance[ayer] - netChange[ayer]
-   *   - ...
+   * Reconstruye el balance de todos los movimientos
+   * partiendo del balance actual y retrocediendo en el tiempo.
+   * La gráfica mostrará cada movimiento (transacción) individualmente.
    */
   private computeBalanceEvolution(
     currentBalance: number,
@@ -98,46 +93,48 @@ export class GetResumenUseCase {
     days: number,
   ): PerformanceDayData[] {
     const today = new Date();
+    const limitDate = new Date(today);
+    limitDate.setDate(limitDate.getDate() - days);
+    limitDate.setHours(0, 0, 0, 0);
+
     const result: PerformanceDayData[] = [];
     let balance = currentBalance;
 
-    for (let i = 0; i < days; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
+    // Ordenar transacciones de más reciente a más antigua
+    const sortedTx = [...transactions].sort((a, b) => {
+      const db = new Date(b.date).getTime();
+      const da = new Date(a.date).getTime();
+      return db - da;
+    });
 
-      const dayStart = new Date(date);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(date);
-      dayEnd.setHours(23, 59, 59, 999);
+    // Punto final: balance actual
+    result.unshift({ name: 'Ahora', balance: Math.max(0, balance) });
 
-      const dayTx = transactions.filter((t) => {
-        const d = new Date(t.date);
-        return d >= dayStart && d <= dayEnd;
-      });
+    for (const tx of sortedTx) {
+      const txDate = new Date(tx.date);
 
-      const label =
-        i === 0
-          ? 'Hoy'
-          : date.toLocaleDateString('es-MX', {
-              day: 'numeric',
-              month: 'short',
-            });
+      // Si la transacción está en el rango de tiempo seleccionado, la añadimos a la gráfica
+      if (txDate >= limitDate) {
+        const label = txDate.toLocaleString('es-MX', {
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
 
-      // Insertar al inicio para que el array quede ordenado ASC (más antiguo primero)
-      result.unshift({ name: label, balance: Math.max(0, balance) });
+        // Insertamos al inicio para que el array quede ordenado de más antiguo a más reciente
+        result.unshift({
+          name: label,
+          balance: Math.max(0, balance),
+        });
+      }
 
-      // Calcular cambio neto del día para poder retroceder al día anterior
-      const netChange = dayTx.reduce((sum, t) => {
-        if (['WIN', 'DEPOSIT', 'CONVERT_TO_CHIPS'].includes(t.action)) {
-          return sum + t.amount;
-        }
-        if (['BET', 'WITHDRAW'].includes(t.action)) {
-          return sum - t.amount;
-        }
-        return sum;
-      }, 0);
-
-      balance -= netChange;
+      // Deshacemos la transacción para conocer el balance ANTES de que ocurriera
+      if (['WIN', 'DEPOSIT', 'CONVERT_TO_CHIPS'].includes(tx.action)) {
+        balance -= tx.amount;
+      } else if (['BET', 'WITHDRAW'].includes(tx.action)) {
+        balance += tx.amount;
+      }
     }
 
     return result;
