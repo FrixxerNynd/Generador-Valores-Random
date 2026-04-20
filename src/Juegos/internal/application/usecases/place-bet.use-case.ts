@@ -16,16 +16,22 @@ export class PlaceBetUseCase {
       throw new NotFoundException(`Juego '${bet.gameType}' no soportado.`);
     }
 
-    // 1. Verificar y Debitar Saldo
-    const balance = await this.walletPort.getBalance(accessToken);
-    if (balance < bet.amount) {
-      throw new BadRequestException('Saldo insuficiente para realizar la apuesta.');
-    }
-
+    // 1. Verificar y Debitar Saldo (solo si es mayor a 0)
+    let debited = false;
     const gameLabel = plugin.getName().charAt(0).toUpperCase() + plugin.getName().slice(1);
-    const debited = await this.walletPort.debit(accessToken, bet.amount, `Apuesta en ${gameLabel}`);
-    if (!debited) {
-      throw new Error('Error al procesar el débito en la billetera.');
+    
+    if (bet.amount > 0) {
+      const balance = await this.walletPort.getBalance(accessToken);
+      if (balance < bet.amount) {
+        throw new BadRequestException('Saldo insuficiente para realizar la apuesta.');
+      }
+
+      debited = await this.walletPort.debit(accessToken, bet.amount, `Apuesta en ${gameLabel}`);
+      if (!debited) {
+        throw new Error('Error al procesar el débito en la billetera.');
+      }
+    } else {
+      debited = true; // No hay cobro, la accion es grátis
     }
 
     // 2. Ejecutar Lógica del Juego

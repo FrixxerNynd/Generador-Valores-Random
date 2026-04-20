@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsNotEmpty, IsPositive, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsNotEmpty, IsOptional, Min } from 'class-validator';
 
 export class BetSelectionDto {
   @IsString()
@@ -8,7 +8,7 @@ export class BetSelectionDto {
   value!: string | number;
 
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   amount!: number;
 }
 
@@ -18,7 +18,7 @@ export class PlaceBetDto {
   userId?: string;
 
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   amount!: number;
 
   @IsString()
@@ -26,5 +26,5 @@ export class PlaceBetDto {
   gameType!: string;
 
   @IsOptional()
-  selection?: BetSelectionDto[] | number | string;
+  selection?: BetSelectionDto[] | number | string | Record<string, any>; // Selection in Blackjack passes object with { action, token }
 }
